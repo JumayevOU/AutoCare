@@ -1,13 +1,14 @@
 import re
 import uuid
 from typing import Optional
+from aiogram import F, Router
 from aiogram import types
 from aiogram.types import (
     Message, CallbackQuery,
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
-    InlineKeyboardMarkup, InlineKeyboardButton
+    InlineKeyboardMarkup, InlineKeyboardButton, ContentType
 )
-from aiogram.dispatcher import FSMContext
+from aiogram.fsm.context import FSMContext
 from keyboards.inline.menu import categoryMenu
 from data.config import ADMIN_GROUP_ID
 from loader import dp, bot
@@ -17,6 +18,7 @@ try:
 except Exception:
     back2 = None
 
+router = Router()
 REQUESTS = {}
 
 NAME_REGEX = re.compile(r"^[A-Za-zА-Яа-яЁёҒғҚқЎўҲҳЇїІіЄє'`’\-\s]+$")  
@@ -109,14 +111,14 @@ def validate_working_hours(text: str) -> bool:
     return True
 
 
-@dp.callback_query_handler(text="hamkorlik")
-async def start_partnership(call: CallbackQuery):
+@router.callback_query(F.data == "hamkorlik")
+async def start_partnership(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await call.message.answer("🤝 Hamkorlik uchun ariza.\n\nIltimos, ism va familiyangizni kiriting (masalan: Alijon Tursunov):")
-    await PartnershipStates.name.set()
+    await state.set_state(PartnershipStates.name)
 
 
-@dp.message_handler(state=PartnershipStates.name, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.name, F.text)
 async def state_name(message: Message, state: FSMContext):
     name = message.text.strip()
     if not validate_name(name):
@@ -130,10 +132,10 @@ async def state_name(message: Message, state: FSMContext):
     kb.add(KeyboardButton(text="📲 Telefonni kontakt orqali yuborish", request_contact=True))
     kb.add(KeyboardButton(text="✏️ Telefonni yozib yuborish"))
     await message.answer("📞 Iltimos, telefon raqamingizni yuboring (kontakt yoki yozib):", reply_markup=kb)
-    await PartnershipStates.phone.set()
+    await state.set_state(PartnershipStates.phone)
 
 
-@dp.message_handler(content_types=types.ContentType.CONTACT, state=PartnershipStates.phone)
+@router.message(PartnershipStates.phone, F.content_type == ContentType.CONTACT)
 async def state_phone_contact(message: Message, state: FSMContext):
     contact = message.contact
     phone = contact.phone_number if contact else None
@@ -153,11 +155,10 @@ async def state_phone_contact(message: Message, state: FSMContext):
 
     await state.update_data(phone=normalized)
     await message.answer("🏢 Kompaniya nomini kiriting (agar yo‘q bo‘lsa — 'Yo‘q' deb yozing):", reply_markup=ReplyKeyboardRemove())
-    await PartnershipStates.company.set()
+    await state.set_state(PartnershipStates.company)
 
 
-@dp.message_handler(lambda m: m.text and m.text != "📲 Telefonni kontakt orqali yuborish",
-                    state=PartnershipStates.phone, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.phone, F.text & (F.text != "📲 Telefonni kontakt orqali yubor"))
 async def state_phone_text(message: Message, state: FSMContext):
     text = message.text.strip()
     if text == "✏️ Telefonni yozib yuborish":
@@ -178,58 +179,57 @@ async def state_phone_text(message: Message, state: FSMContext):
 
     await state.update_data(phone=normalized)
     await message.answer("🏢 Kompaniya nomini kiriting (agar yo‘q bo‘lsa — 'Yo‘q' deb yozing):", reply_markup=ReplyKeyboardRemove())
-    await PartnershipStates.company.set()
+    await state.set_state(PartnershipStates.company)
 
 
-@dp.message_handler(state=PartnershipStates.company, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.company, F.text)
 async def state_company(message: Message, state: FSMContext):
     await state.update_data(company=message.text.strip())
     await message.answer("📍 Manzilingizni matn shaklida kiriting (masalan: Sergeli tumani, S. Juraev ko'chasi, 12-uy):")
-    await PartnershipStates.address_text.set()
+    await state.set_state(PartnershipStates.address_text)
 
 
-@dp.message_handler(state=PartnershipStates.address_text, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.address_text, F.text)
 async def state_address_text(message: Message, state: FSMContext):
     await state.update_data(address_text=message.text.strip())
     kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     kb.add(KeyboardButton(text="📍 Geolokatsiya yuborish", request_location=True))
     kb.add(KeyboardButton(text="⛔ Geolokatsiyani o'tkazish"))
     await message.answer("Iloji bo'lsa, aniq joy uchun geolokatsiya ham yuborishingiz mumkin (tavsiya qilinadi).", reply_markup=kb)
-    await PartnershipStates.wait_geo.set()
+    await state.set_state(PartnershipStates.wait_geo)
 
 
-@dp.message_handler(content_types=types.ContentType.LOCATION, state=PartnershipStates.wait_geo)
+@router.message(PartnershipStates.wait_geo, F.content_type == ContentType.LOCATION)
 async def state_geo_location(message: Message, state: FSMContext):
     loc = message.location
     await state.update_data(geo_lat=loc.latitude, geo_lon=loc.longitude)
     await message.answer("🧾 Qaysi xizmat turlarini taklif qilasiz? (masalan: Dvigatel tamiri, Kuzov, Elektrik):", reply_markup=ReplyKeyboardRemove())
-    await PartnershipStates.services.set()
+    await state.set_state(PartnershipStates.services)
 
 
-@dp.message_handler(lambda m: m.text == "⛔ Geolokatsiyani o'tkazish", state=PartnershipStates.wait_geo,
-                    content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.wait_geo, F.text & (F.text == "⛔ Geolokatsiyani o'tkazish"))
 async def state_geo_skip(message: Message, state: FSMContext):
     await state.update_data(geo_lat=None, geo_lon=None)
     await message.answer("🧾 Qaysi xizmat turlarini taklif qilasiz? (masalan: Dvigatel tamiri, Kuzov, Elektrik):", reply_markup=ReplyKeyboardRemove())
-    await PartnershipStates.services.set()
+    await state.set_state(PartnershipStates.services)
 
 
-@dp.message_handler(state=PartnershipStates.wait_geo, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.wait_geo, F.text)
 async def state_geo_other_text(message: Message, state: FSMContext):
     await state.update_data(geo_lat=None, geo_lon=None)
     await state.update_data(address_text=message.text.strip())
     await message.answer("🧾 Qaysi xizmat turlarini taklif qilasiz? (masalan: Dvigatel tamiri, Kuzov, Elektrik):", reply_markup=ReplyKeyboardRemove())
-    await PartnershipStates.services.set()
+    await state.set_state(PartnershipStates.services)
 
 
-@dp.message_handler(state=PartnershipStates.services, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.services, F.text)
 async def state_services(message: Message, state: FSMContext):
     await state.update_data(services=message.text.strip())
     await message.answer("📅 Ish kunlarini kiriting (masalan: Dushanba-Yakshanba yoki Dushanba,Chorshanba,...):")
-    await PartnershipStates.working_days.set()
+    await state.set_state(PartnershipStates.working_days)
 
 
-@dp.message_handler(state=PartnershipStates.working_days, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.working_days, F.text)
 async def state_working_days(message: Message, state: FSMContext):
     text = message.text.strip()
     if not validate_working_days(text):
@@ -240,10 +240,10 @@ async def state_working_days(message: Message, state: FSMContext):
         return
     await state.update_data(working_days=text)
     await message.answer("🕰 Ish soatini kiriting (masalan: 09:00-18:00 yoki 24/7):")
-    await PartnershipStates.working_hours.set()
+    await state.set_state(PartnershipStates.working_hours)
 
 
-@dp.message_handler(state=PartnershipStates.working_hours, content_types=types.ContentTypes.TEXT)
+@router.message(PartnershipStates.working_hours, F.text)
 async def state_working_hours(message: Message, state: FSMContext):
     text = message.text.strip()
     if not validate_working_hours(text):
@@ -282,10 +282,10 @@ async def state_working_hours(message: Message, state: FSMContext):
     )
 
     await message.answer(summary, parse_mode="HTML", reply_markup=kb_confirm)
-    await PartnershipStates.confirm.set()
+    await state.set_state(PartnershipStates.confirm)
 
 
-@dp.callback_query_handler(text="partnership_confirm", state=PartnershipStates.confirm)
+@router.callback_query(F.data == "partnership_confirm", state=PartnershipStates.confirm)
 async def partnership_confirm(call: CallbackQuery, state: FSMContext):
     await call.answer()
     data = await state.get_data()
@@ -366,7 +366,7 @@ async def partnership_confirm(call: CallbackQuery, state: FSMContext):
     except Exception as e:
         print("Error sending to admin group (message):", e)
         await call.message.answer("❌ Arizani adminlarga yuborishda xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.", reply_markup=back2 or ReplyKeyboardRemove())
-        await state.finish()
+        await state.clear()
         REQUESTS.pop(request_id, None)
         return
 
@@ -381,10 +381,10 @@ async def partnership_confirm(call: CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
-    await state.finish()
+    await state.clear()
 
 
-@dp.callback_query_handler(text="partnership_cancel", state=PartnershipStates.confirm)
+@router.callback_query(F.data == "partnership_cancel", state=PartnershipStates.confirm)
 async def partnership_cancel(call: CallbackQuery, state: FSMContext):
     await call.answer()
     try:
@@ -405,12 +405,12 @@ async def partnership_cancel(call: CallbackQuery, state: FSMContext):
         except Exception:
             pass
 
-    await state.finish()
+    await state.clear()
 
     try:
         user_id = call.from_user.id
         to_delete = []
-        for rid, val in REQUESTS.items():
+        for rid, val in list(REQUESTS.items()):
             if val.get("user_id") == user_id:
                 to_delete.append(rid)
         for rid in to_delete:
@@ -419,7 +419,7 @@ async def partnership_cancel(call: CallbackQuery, state: FSMContext):
         pass
 
 
-@dp.callback_query_handler(lambda c: c.data and c.data.startswith("admin_confirm:"))
+@router.callback_query(lambda c: c.data and c.data.startswith("admin_confirm:"))
 async def admin_confirm_handler(call: CallbackQuery):
     await call.answer()
     try:
@@ -455,10 +455,14 @@ async def admin_confirm_handler(call: CallbackQuery):
 
     except Exception as e:
         print("admin_confirm_handler error:", e)
-        await call.answer("Xatolik yuz berdi.", show_alert=True)
+        # aiogram v3: callback_query.answer is async; using call.answer to show alert
+        try:
+            await call.answer("Xatolik yuz berdi.", show_alert=True)
+        except Exception:
+            pass
 
 
-@dp.callback_query_handler(lambda c: c.data and c.data.startswith("admin_cancel:"))
+@router.callback_query(lambda c: c.data and c.data.startswith("admin_cancel:"))
 async def admin_cancel_handler(call: CallbackQuery):
     await call.answer()
     try:
@@ -503,4 +507,10 @@ async def admin_cancel_handler(call: CallbackQuery):
 
     except Exception as e:
         print("admin_cancel_handler error:", e)
-        await call.answer("Xatolik yuz berdi.", show_alert=True)
+        try:
+            await call.answer("Xatolik yuz berdi.", show_alert=True)
+        except Exception:
+            pass
+
+
+dp.include_router(router)
