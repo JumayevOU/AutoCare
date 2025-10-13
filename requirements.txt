@@ -1,5 +1,5 @@
-aiogram~=2.25
-environs~=8.0.0
+aiogram
+environs
 marshmallow==3.19.0
 asyncpg
 psycopg2-binary
