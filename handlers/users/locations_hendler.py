@@ -1,8 +1,13 @@
+from aiogram import F, Router
 from aiogram import types
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ContentType
+)
 from loader import dp
 from keyboards.default.location_button import keyboard, back, back2
 from utils.misc.get_distance import choose_shortest
+
+router = Router()
 
 GEO_CACHE = {
     "autoservice": {},
@@ -54,7 +59,6 @@ def format_compact_days(days_list):
     Compact ko'rinish: 'D✅ S✅ Ch✅ P✅ J✅ | Sh❌ Y❌' kabi
     """
     open_days = normalize_days(days_list)
-    parts = []
     left_parts = []
     right_parts = []
     for i in range(0, 5):
@@ -97,27 +101,27 @@ def short_address(address):
     return address
 
 
-@dp.callback_query_handler(text="autoservice")
+@router.callback_query(F.data == "autoservice")
 async def show_autoservice_request(call: CallbackQuery):
     await call.message.answer(
         "🛠 Iltimos, joylashuvingizni yuboring (eng yaqin avtoservisni topish uchun):",
         reply_markup=keyboard
     )
-    dp.current_place_type = "autoservice"
+    setattr(dp, "current_place_type", "autoservice")
     await call.answer()
 
 
-@dp.callback_query_handler(text="moyka")
+@router.callback_query(F.data == "moyka")
 async def show_carwash_request(call: CallbackQuery):
     await call.message.answer(
         "🚗 Iltimos, joylashuvingizni yuboring (eng yaqin avtomoykani topish uchun):",
         reply_markup=keyboard
     )
-    dp.current_place_type = "carwash"
+    setattr(dp, "current_place_type", "carwash")
     await call.answer()
 
 
-@dp.message_handler(content_types=['location'])
+@router.message(F.content_type == ContentType.LOCATION)
 async def get_nearest_places(message: Message):
     location = message.location
     place_type = getattr(dp, "current_place_type", "autoservice")
@@ -137,7 +141,7 @@ async def get_nearest_places(message: Message):
         address = place.get("address", "Manzil yo'q")
         services = place.get("services", []) or []
         working_days = place.get("working_days", [])
-        wh = place.get("working_hours", {})
+        wh = place.get("working_hours", {}) or {}
         hours_text = "24/7" if place.get("is_24_7") else (f"{wh.get('start','?')}–{wh.get('end','?')}" if wh else "Ma'lumot yo'q")
         phone = place.get("phone")
         gmaps_url = place.get("gmaps_url")
@@ -188,7 +192,7 @@ async def get_nearest_places(message: Message):
         await message.answer("✅ Eng yaqin 3 ta avtoservis ko‘rsatildi!", reply_markup=back)
 
 
-@dp.callback_query_handler(lambda c: c.data.startswith("geo_id_"))
+@router.callback_query(lambda c: c.data and c.data.startswith("geo_id_"))
 async def send_geo(call: CallbackQuery):
     parts = call.data.split("_", 3)
     if len(parts) < 4:
@@ -213,3 +217,6 @@ async def send_geo(call: CallbackQuery):
     except Exception as e:
         print("send_geo error:", e)
         await call.answer("❌ Lokatsiyani yuborishda xatolik yuz berdi.", show_alert=True)
+
+
+dp.include_router(router)
