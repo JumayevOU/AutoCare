@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 aiogram = "~=2.14"
-environs = "~=8.0.0"
+environs = "~=14.3.0"
 
 [dev-packages]
 
