@@ -1,5 +1,5 @@
 import math
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from aiogram import types
 from utils.misc import show_on_gmaps
 from data.locations import Autoservice, CarWash
@@ -18,7 +18,7 @@ def calc_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def choose_shortest(
-    location: types.Location | dict,
+    location: Union[types.Location, dict],
     max_results: Optional[int] = 10,
     place_type: str = "autoservice"
 ) -> List[Dict[str, Any]]:
@@ -28,11 +28,17 @@ def choose_shortest(
     max_results: nechta natija qaytarilsin
     """
     if hasattr(location, "latitude") and hasattr(location, "longitude"):
-        user_lat = float(location.latitude)
-        user_lon = float(location.longitude)
+        try:
+            user_lat = float(location.latitude)
+            user_lon = float(location.longitude)
+        except Exception:
+            raise ValueError("Location latitude/longitude could not be parsed to float.")
     elif isinstance(location, dict):
-        user_lat = float(location.get("lat") or location.get("latitude"))
-        user_lon = float(location.get("lon") or location.get("longitude"))
+        try:
+            user_lat = float(location.get("lat") or location.get("latitude"))
+            user_lon = float(location.get("lon") or location.get("longitude"))
+        except Exception:
+            raise ValueError("Location dict must contain 'lat'/'lon' or 'latitude'/'longitude' convertible to float.")
     else:
         raise ValueError("Location format not supported. Use message.location or {'lat','lon'} dict.")
 
