@@ -9,7 +9,7 @@ categoryMenu = InlineKeyboardMarkup(
         ],
         [
             InlineKeyboardButton(text="🛡️ Bloklashga qarshi tizim", callback_data='security'),
-            InlineKeyboardButton(text="⛽ Yoqilg'i yetqazib berish", callback_data='moyka'),
+            InlineKeyboardButton(text="⛽ Yoqilg'i yetqazib berish", callback_data='fuel'),
         ],
         [
             InlineKeyboardButton(text="🤝 Hamkorlik", callback_data='hamkorlik'),
@@ -36,3 +36,17 @@ xizmatlar = InlineKeyboardMarkup(
             InlineKeyboardButton(text="🌐 Universal", callback_data='universal'),
         ],
     ])
+
+
+
+info = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text='📍 Geolokatsiya', callback_data='geolokatsiya'),
+        ],
+        [
+            InlineKeyboardButton(text='📞 Aloqa', url='tg://resolve?phone=998333500155'),
+        ],
+    ]
+)
+
