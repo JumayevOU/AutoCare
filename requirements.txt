@@ -3,3 +3,4 @@ environs==9.5.0
 marshmallow==3.19.0
 python-dotenv
 asyncpg
+aiohttp
