@@ -30,10 +30,8 @@ async def main():
     bot = Bot(token=API_TOKEN)
     dp = Dispatcher()
     
-    # Routerlarni sozlash
-    routers = setup_routers()
-    for router in routers:
-        dp.include_router(router)
+    # Routerlarni sozlash - TO'G'RI USUL
+    setup_routers(dp)  # dp ni argument sifatida beramiz
     
     try:
         logging.info("🤖 Bot ishga tushmoqda...")
