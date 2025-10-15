@@ -1,9 +1,12 @@
+# handlers/users/menuHendlers.py
 from typing import Optional
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.enums import ParseMode
 from keyboards.inline.menu import xizmatlar, categoryMenu
 from keyboards.default.location_button import keyboard
+
+# locations_hendler dan user_place_type ni import qilamiz
 from handlers.users.locations_hendler import user_place_type
 
 try:
@@ -36,7 +39,7 @@ async def on_moyka(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "carwash"
     print(f"DEBUG: moyka tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Avtomoyka</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Avtomoyka</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -47,7 +50,7 @@ async def on_elektrik(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: elektrik tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Elektrik</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Elektrik</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -57,7 +60,7 @@ async def on_kuzov(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: kuzov tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -67,7 +70,7 @@ async def on_motor(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: motor tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -77,7 +80,7 @@ async def on_vulkanizatsiya(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: vulkanizatsiya tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Vulkanizatsiya</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Vulkanizatsiya</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -87,7 +90,7 @@ async def on_balon(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: balon tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -97,7 +100,7 @@ async def on_tanirovka(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: tanirovka tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -107,7 +110,7 @@ async def on_shumka(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: shumka tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -117,9 +120,10 @@ async def on_universal(call: CallbackQuery) -> None:
     user_place_type[call.from_user.id] = "autoservice"
     print(f"DEBUG: universal tanlandi - user_id: {call.from_user.id}")
     
-    text = "<b>📍 Joylashuvingizni jo'natting</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
+    text = "<b>📍 Joylashuvingizni yuboring</b>, biz sizga eng yaqin <b>Avtoservice</b>larni ko'rsatamiz 🤩"
     if call.message:
         await call.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
 
 
 
