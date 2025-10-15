@@ -1,5 +1,5 @@
 import math
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union  # Union ni qo'shing
 from aiogram.types import Location
 from utils.misc import show_on_gmaps
 from data.locations import Autoservice, CarWash
@@ -20,7 +20,7 @@ def calc_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def choose_shortest(
-    location: Location | dict,
+    location: Union[Location, dict],  # BU YERNI O'ZGARTIRING
     max_results: Optional[int] = 10,
     place_type: str = "autoservice"
 ) -> List[Dict[str, Any]]:
@@ -104,7 +104,6 @@ def choose_shortest(
     return results[:max_results]
 
 
-
 def filter_places_by_service(
     places: List[Dict[str, Any]], 
     service_filter: str,
@@ -128,7 +127,7 @@ def filter_places_by_service(
 
 
 def get_places_in_radius(
-    location: Location | dict,
+    location: Union[Location, dict],  # BU YERNI HAM O'ZGARTIRING
     radius_km: float = 5.0,
     place_type: str = "autoservice"
 ) -> List[Dict[str, Any]]:
