@@ -1,3 +1,4 @@
+# handlers/users/locations_hendler.py
 from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
@@ -10,6 +11,7 @@ from utils.misc.get_distance import choose_shortest
 router = Router()
 logger = logging.getLogger(__name__)
 
+# Cache saqlash uchun
 GEO_CACHE = {
     "autoservice": {},
     "carwash": {}
@@ -24,9 +26,9 @@ WEEK_DAYS_SHORT = {
     0: "D", 1: "S", 2: "Ch", 3: "P", 4: "J", 5: "Sh", 6: "Y"
 }
 
-# Avtoservice uchun xizmatlar ro'yxati - Siz ko'rsatgan tartibda
+# Avtoservice uchun xizmatlar ro'yxati
 SERVICE_ORDER = [
-    "Elektrik", "Kuzov tamiri", "Dvigatel tamiri", "Vulkanizatsiya",
+    "Elektrik", "Kasaprab", "Motarius", "Vulkanizatsiya",
     "Razval", "Tonirovka", "Shumka", "Universal"
 ]
 
@@ -37,6 +39,7 @@ CARWASH_SERVICES = [
     "Salon tozalash", "Disk tozalash"
 ]
 
+# Joy turini saqlash uchun user ma'lumotlari
 user_place_type = {}
 
 # ================== FUNKSIYALAR ==================
@@ -81,6 +84,9 @@ def format_services_with_status(available_services, service_type="autoservice"):
     return services_text
 
 def short_address(address, max_words=5):
+    """
+    Manzilni qisqartirish
+    """
     words = address.split()
     if len(words) > max_words:
         return ' '.join(words[:max_words]) + '...'
@@ -96,6 +102,7 @@ async def get_nearest_places(message: Message):
     logger.debug(f"Location qabul qilindi: user_id={user_id}")
     logger.debug(f"user_place_type: {user_place_type}")
     
+    # Foydalanuvchi turini olish
     place_type = user_place_type.get(user_id)
     
     if not place_type:
@@ -106,7 +113,8 @@ async def get_nearest_places(message: Message):
     logger.debug(f"Foydalanuvchi {user_id} uchun place_type: {place_type}")
     
     try:
-        closest_places = choose_shortest(location, max_results=3, place_type=place_type)
+        # Database dan eng yaqin joylarni olish
+        closest_places = await choose_shortest(location, max_results=3, place_type=place_type)
         logger.debug(f"choose_shortest {len(closest_places)} ta joy qaytardi")
     except Exception as e:
         logger.error(f"choose_shortest xatosi: {e}")
@@ -132,10 +140,7 @@ async def get_nearest_places(message: Message):
         working_hours = place.get("working_hours", {})
         is_24_7 = place.get("is_24_7", False)
         phone = place.get("phone")
-        
-        lat = place.get("lat")
-        lon = place.get("lon")
-        gmaps_url = f"https://maps.google.com/?q={lat},{lon}" if lat and lon else "https://maps.google.com"
+        gmaps_url = place.get("gmaps_url", "https://maps.google.com")
 
         logger.debug(f"Joy #{index}: {name}, masofa: {distance} km")
 
@@ -196,6 +201,7 @@ async def get_nearest_places(message: Message):
     else:
         await message.answer("✅ Eng yaqin 3 ta avtoservis ko'rsatildi!", reply_markup=back)
     
+    # Foydalanuvchini ro'yxatdan o'chirish
     user_place_type.pop(user_id, None)
     logger.debug(f"Foydalanuvchi {user_id} user_place_type dan o'chirildi")
 
