@@ -1,3 +1,4 @@
+# database.py - TEKSHRILGAN VERSIYA
 import os
 import asyncio
 import asyncpg
