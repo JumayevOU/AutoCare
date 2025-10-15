@@ -1,18 +1,10 @@
 import asyncio
-from aiogram import Bot, Dispatcher
-from database import init_db, close_db
+from loader import dp, bot
+from handlers import setup_routers
 
 async def main():
-    await init_db()
-    
-    bot = Bot(token=API_TOKEN)
-    dp = Dispatcher()
-    
-    
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await close_db()
+    setup_routers(dp)
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
