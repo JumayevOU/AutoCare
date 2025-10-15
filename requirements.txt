@@ -1,2 +1,4 @@
-aiogram~=3.22.0
+aiogram==3.22.0
+environs==9.5.0
+marshmallow==3.19.0
 python-dotenv
