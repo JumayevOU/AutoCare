@@ -2,7 +2,7 @@
 import math
 from typing import Optional, List, Dict, Any, Union
 from aiogram.types import Location
-from database import get_nearby_places  # Database dan import
+from database import get_nearby_places
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,9 +36,13 @@ async def choose_shortest(
         places = await get_nearby_places(
             user_lat, 
             user_lon, 
-            radius_km=50.0,  # 50 km radius
+            radius_km=50.0,
             place_type=place_type
         )
+        
+        if not places:
+            logger.debug("Database dan hech qanday joy topilmadi")
+            return []
         
         # Kerakli formatga o'tkazish
         results = []
@@ -66,7 +70,6 @@ async def choose_shortest(
         
     except Exception as e:
         logger.error(f"Database dan ma'lumot olishda xatolik: {e}")
-        # Agar database dan ma'lumot olishda xatolik bo'lsa, bo'sh ro'yxat qaytaramiz
         return []
 
 def calc_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
