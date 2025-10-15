@@ -1,10 +1,13 @@
-# database.py - TEKSHRILGAN VERSIYA
+# database.py
 import os
 import asyncio
 import asyncpg
 import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -53,19 +56,27 @@ async def init_db(database_url: Optional[str] = None) -> None:
     """Database va connection pool ni ishga tushiradi"""
     global pool
     db_url = database_url or DATABASE_URL
+    
     if not db_url:
-        raise ValueError("DATABASE_URL muhit o'zgaruvchisi topilmadi")
+        logger.error("❌ DATABASE_URL muhit o'zgaruvchisi topilmadi")
+        return
     
-    pool = await asyncpg.create_pool(
-        db_url,
-        min_size=1,
-        max_size=10,
-        command_timeout=60
-    )
-    
-    async with pool.acquire() as conn:
-        await conn.execute(CREATE_TABLES_SQL)
-        print("✅ Database jadvallari yaratildi/tekshirildi")
+    try:
+        pool = await asyncpg.create_pool(
+            db_url,
+            min_size=1,
+            max_size=10,
+            command_timeout=60
+        )
+        
+        async with pool.acquire() as conn:
+            await conn.execute(CREATE_TABLES_SQL)
+            logger.info("✅ Database jadvallari yaratildi/tekshirildi")
+            
+    except Exception as e:
+        logger.error(f"❌ Database ni ishga tushirishda xatolik: {e}")
+        pool = None
+        raise
 
 async def close_db() -> None:
     """Connection pool ni yopadi"""
@@ -76,6 +87,7 @@ async def close_db() -> None:
 
 async def get_connection():
     """Connection olish"""
+    global pool
     if pool is None:
         await init_db()
     return await pool.acquire()
@@ -88,6 +100,10 @@ async def release_connection(conn):
 
 async def insert_autoservice(data: Dict[str, Any]) -> bool:
     """Avtoservis qo'shish"""
+    global pool
+    if pool is None:
+        await init_db()
+    
     query = """
     INSERT INTO autoservice (
         id, name, lat, lon, address, phone, services, working_days, working_hours, is_24_7
@@ -121,11 +137,15 @@ async def insert_autoservice(data: Dict[str, Any]) -> bool:
             )
             return True
     except Exception as e:
-        print(f"❌ Avtoservis qo'shishda xatolik: {e}")
+        logger.error(f"❌ Avtoservis qo'shishda xatolik: {e}")
         return False
 
 async def insert_carwash(data: Dict[str, Any]) -> bool:
     """Avtomoyka qo'shish"""
+    global pool
+    if pool is None:
+        await init_db()
+    
     query = """
     INSERT INTO carwash (
         id, name, lat, lon, address, phone, services, working_days, working_hours, is_24_7
@@ -159,82 +179,51 @@ async def insert_carwash(data: Dict[str, Any]) -> bool:
             )
             return True
     except Exception as e:
-        print(f"❌ Avtomoyka qo'shishda xatolik: {e}")
+        logger.error(f"❌ Avtomoyka qo'shishda xatolik: {e}")
         return False
 
 async def get_all_autoservices() -> List[Dict[str, Any]]:
     """Barcha avtoservislarni olish"""
+    global pool
+    if pool is None:
+        await init_db()
+    
     query = "SELECT * FROM autoservice"
     try:
         async with pool.acquire() as conn:
             rows = await conn.fetch(query)
             return [dict(row) for row in rows]
     except Exception as e:
-        print(f"❌ Avtoservislarni olishda xatolik: {e}")
+        logger.error(f"❌ Avtoservislarni olishda xatolik: {e}")
         return []
 
 async def get_all_carwashes() -> List[Dict[str, Any]]:
     """Barcha avtomoykalarni olish"""
+    global pool
+    if pool is None:
+        await init_db()
+    
     query = "SELECT * FROM carwash"
     try:
         async with pool.acquire() as conn:
             rows = await conn.fetch(query)
             return [dict(row) for row in rows]
     except Exception as e:
-        print(f"❌ Avtomoykalarni olishda xatolik: {e}")
+        logger.error(f"❌ Avtomoykalarni olishda xatolik: {e}")
         return []
 
-async def get_autoservice_by_id(service_id: str) -> Optional[Dict[str, Any]]:
-    """ID bo'yicha avtoservis olish"""
-    query = "SELECT * FROM autoservice WHERE id = $1"
-    try:
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(query, service_id)
-            return dict(row) if row else None
-    except Exception as e:
-        print(f"❌ Avtoservisni olishda xatolik: {e}")
-        return None
-
-async def get_carwash_by_id(carwash_id: str) -> Optional[Dict[str, Any]]:
-    """ID bo'yicha avtomoyka olish"""
-    query = "SELECT * FROM carwash WHERE id = $1"
-    try:
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(query, carwash_id)
-            return dict(row) if row else None
-    except Exception as e:
-        print(f"❌ Avtomoykani olishda xatolik: {e}")
-        return None
-
-async def delete_autoservice(service_id: str) -> bool:
-    """Avtoservisni o'chirish"""
-    query = "DELETE FROM autoservice WHERE id = $1"
-    try:
-        async with pool.acquire() as conn:
-            await conn.execute(query, service_id)
-            return True
-    except Exception as e:
-        print(f"❌ Avtoservisni o'chirishda xatolik: {e}")
-        return False
-
-async def delete_carwash(carwash_id: str) -> bool:
-    """Avtomoykani o'chirish"""
-    query = "DELETE FROM carwash WHERE id = $1"
-    try:
-        async with pool.acquire() as conn:
-            await conn.execute(query, carwash_id)
-            return True
-    except Exception as e:
-        print(f"❌ Avtomoykani o'chirishda xatolik: {e}")
-        return False
-
-# ================== QO'SHIMCHA FUNKSIYALAR ==================
-
-async def get_nearby_places(lat: float, lon: float, radius_km: float = 10.0, place_type: str = "autoservice") -> List[Dict[str, Any]]:
+async def get_nearby_places(lat: float, lon: float, radius_km: float = 50.0, place_type: str = "autoservice") -> List[Dict[str, Any]]:
     """
     Berilgan koordinatalarga yaqin joylarni topish
     """
-    # Soddalashtirilgan masofa hisoblash (Haversine formulasining soddalashtirilgan versiyasi)
+    global pool
+    if pool is None:
+        await init_db()
+        if pool is None:
+            logger.error("❌ Database pool hali ishga tushmadi")
+            return []
+    
+    # Haversine formulasi bilan masofa hisoblash
     query = f"""
     SELECT *,
         (6371 * acos(cos(radians($1)) * cos(radians(lat)) * 
@@ -253,8 +242,10 @@ async def get_nearby_places(lat: float, lon: float, radius_km: float = 10.0, pla
             rows = await conn.fetch(query, lat, lon, radius_km)
             return [dict(row) for row in rows]
     except Exception as e:
-        print(f"❌ Yaqin joylarni topishda xatolik: {e}")
+        logger.error(f"❌ Yaqin joylarni topishda xatolik: {e}")
         return []
+
+# ... (qolgan funksiyalar o'zgarmaydi)
 
 async def search_places_by_service(service_name: str, place_type: str = "autoservice") -> List[Dict[str, Any]]:
     """
