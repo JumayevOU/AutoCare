@@ -1,4 +1,5 @@
 import uuid
+import logging
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
@@ -25,6 +26,8 @@ try:
 except ImportError:
     insert_autoservice = None
     insert_carwash = None
+
+logger = logging.getLogger(__name__)
 
 # Global requests storage
 REQUESTS = {}
@@ -279,7 +282,7 @@ def setup_callback_handlers(router: Router):
                 lat = data.get('geo_lat')
                 lon = data.get('geo_lon')
                 if lat is None or lon is None:
-                    print(f"⚠️ Warning: Missing geo coordinates for request {request_id}, using 0.0")
+                    logger.warning(f"Missing geo coordinates for request {request_id}, using 0.0")
                     lat = 0.0
                     lon = 0.0
                 else:
@@ -346,15 +349,15 @@ def setup_callback_handlers(router: Router):
                 # Insert into database
                 db_saved = await insert_autoservice(entry)
                 if db_saved:
-                    print(f"✅ Partnership request {request_id} saved to DB successfully")
+                    logger.info(f"Partnership request {request_id} saved to DB successfully")
                 else:
-                    print(f"⚠️ Failed to save partnership request {request_id} to DB")
+                    logger.warning(f"Failed to save partnership request {request_id} to DB")
                     
             except Exception as e:
-                print(f"❌ Error saving partnership request {request_id} to DB: {e}")
+                logger.error(f"Error saving partnership request {request_id} to DB: {e}")
                 db_saved = False
         else:
-            print("⚠️ insert_autoservice not available, skipping DB save")
+            logger.warning("insert_autoservice not available, skipping DB save")
 
         # Notify user
         user_chat_id = req["user_chat_id"]
