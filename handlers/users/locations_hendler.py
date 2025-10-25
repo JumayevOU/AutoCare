@@ -1,7 +1,14 @@
 # handlers/users/locations_hendler.py
+"""
+Handler for location-based queries.
+
+Processes user location to find and display nearby autoservices
+and carwashes with detailed information.
+"""
 from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
+from typing import List, Dict, Any
 import logging
 
 from loader import bot
@@ -44,9 +51,16 @@ user_place_type = {}
 
 # ================== FUNKSIYALAR ==================
 
-def format_working_days_compact(working_days_list):
+def format_working_days_compact(working_days_list: List[int]) -> str:
     """
-    Ish kunlarini qisqa formatda ko'rsatish: D✅ S✅ Ch✅ P✅ J✅ | Sh✅ Y✅
+    Format working days in compact format.
+    
+    Args:
+        working_days_list: List of working day numbers (0-6, where 0=Monday)
+        
+    Returns:
+        str: Formatted string showing working days with checkmarks
+        Example: "D✅ S✅ Ch✅ P✅ J✅  |  Sh❌ Y❌"
     """
     if not working_days_list:
         return "Ma'lumot yo'q"
@@ -59,15 +73,22 @@ def format_working_days_compact(working_days_list):
         else:
             days_display.append(f"{day_symbol}❌")
     
-    # Dushanba-Juma va Shanba-Yakshanba guruhlariga ajratamiz
-    weekdays = " ".join(days_display[:5])  # D-J
-    weekends = " ".join(days_display[5:])  # Sh-Y
+    # Split into weekdays (Mon-Fri) and weekends (Sat-Sun)
+    weekdays = " ".join(days_display[:5])  # Mon-Fri
+    weekends = " ".join(days_display[5:])  # Sat-Sun
     
     return f"{weekdays}  |  {weekends}"
 
-def format_services_with_status(available_services, service_type="autoservice"):
+def format_services_with_status(available_services: List[str], service_type: str = "autoservice") -> str:
     """
-    Xizmatlarni status bilan ko'rsatish: mavjud bo'lsa ✅, yo'q bo'lsa ❌
+    Format services list with availability status.
+    
+    Args:
+        available_services: List of available service names
+        service_type: Type of service ("autoservice" or "carwash")
+        
+    Returns:
+        str: Formatted string with services marked as available (✅) or not (❌)
     """
     services_text = ""
     
@@ -83,9 +104,16 @@ def format_services_with_status(available_services, service_type="autoservice"):
             services_text += f"❌ {service}\n"
     return services_text
 
-def short_address(address, max_words=5):
+def short_address(address: str, max_words: int = 5) -> str:
     """
-    Manzilni qisqartirish
+    Shorten address to specified number of words.
+    
+    Args:
+        address: Full address string
+        max_words: Maximum number of words to keep (default: 5)
+        
+    Returns:
+        str: Shortened address with "..." if truncated
     """
     words = address.split()
     if len(words) > max_words:
@@ -95,38 +123,56 @@ def short_address(address, max_words=5):
 # ================== HANDLERS ==================
 
 @router.message(F.location)
-async def get_nearest_places(message: Message):
+async def get_nearest_places(message: Message) -> None:
+    """
+    Handle location messages and find nearest places.
+    
+    Args:
+        message: Message containing user's location
+    """
     user_id = message.from_user.id
     location = message.location
     
-    logger.debug(f"Location qabul qilindi: user_id={user_id}")
+    # Validate location data
+    if not location or location.latitude is None or location.longitude is None:
+        logger.warning(f"Invalid location data from user {user_id}")
+        await message.answer("❌ Noto'g'ri lokatsiya ma'lumoti / Invalid location data")
+        return
+    
+    # Validate coordinates range
+    if not (-90 <= location.latitude <= 90) or not (-180 <= location.longitude <= 180):
+        logger.warning(f"Invalid coordinates received from user {user_id}")
+        await message.answer("❌ Noto'g'ri koordinatalar / Invalid coordinates")
+        return
+    
+    logger.debug(f"Location received: user_id={user_id}")
     logger.debug(f"user_place_type: {user_place_type}")
     
-    # Foydalanuvchi turini olish
+    # Get user's selected place type
     place_type = user_place_type.get(user_id)
     
     if not place_type:
-        logger.debug(f"Foydalanuvchi {user_id} uchun place_type topilmadi")
+        logger.debug(f"No place_type found for user {user_id}")
         await message.answer("📍 Iltimos, avval servis turini tanlang (avtoservis yoki avtomoyka)")
         return
 
-    logger.debug(f"Foydalanuvchi {user_id} uchun place_type: {place_type}")
+    logger.debug(f"User {user_id} place_type: {place_type}")
     
     try:
-        # Database dan eng yaqin joylarni olish
+        # Get nearest places from database
         closest_places = await choose_shortest(location, max_results=3, place_type=place_type)
-        logger.debug(f"choose_shortest {len(closest_places)} ta joy qaytardi")
+        logger.debug(f"choose_shortest returned {len(closest_places)} places")
     except Exception as e:
-        logger.error(f"choose_shortest xatosi: {e}")
+        logger.error(f"choose_shortest error: {e}")
         await message.answer("❌ Joylarni topishda xatolik yuz berdi")
         return
 
     if not closest_places:
-        logger.debug("Hech qanday joy topilmadi")
+        logger.debug("No places found")
         await message.answer("Hech qanday yaqin joy topilmadi 😔")
         return
 
-    logger.debug(f"{len(closest_places)} ta joy topildi, foydalanuvchiga ko'rsatilmoqda...")
+    logger.debug(f"{len(closest_places)} places found, showing to user...")
 
     for index, place in enumerate(closest_places, start=1):
         place_id = place.get("id") or f"{place_type}_{index}"
@@ -142,9 +188,9 @@ async def get_nearest_places(message: Message):
         phone = place.get("phone")
         gmaps_url = place.get("gmaps_url", "https://maps.google.com")
 
-        logger.debug(f"Joy #{index}: {name}, masofa: {distance} km")
+        logger.debug(f"Place #{index}: {name}, distance: {distance} km")
 
-        # HAR IKKALA TUR UCHUN BIR XIL SHABLON
+        # Format information for both service types
         addr_short = short_address(address)
         compact_days = format_working_days_compact(working_days)
         services_block = format_services_with_status(services, place_type)
@@ -182,54 +228,70 @@ async def get_nearest_places(message: Message):
         ]
         
         if phone:
-            # Telefon raqamini to'g'ri formatga keltiramiz
-            clean_phone = phone.replace('+', '').replace(' ', '')
-            buttons.append([
-                InlineKeyboardButton(text="📞 Aloqa", url=f'tg://resolve?phone={clean_phone}'),
-            ])
+            # Sanitize phone number (remove invalid characters)
+            clean_phone = ''.join(filter(str.isdigit, phone.replace('+', '')))
+            if clean_phone:
+                buttons.append([
+                    InlineKeyboardButton(text="📞 Aloqa", url=f'tg://resolve?phone={clean_phone}'),
+                ])
             
         info_keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
 
         try:
             await message.answer(text, reply_markup=info_keyboard, disable_web_page_preview=False, parse_mode='HTML')
-            logger.debug(f"Joy #{index} foydalanuvchiga yuborildi")
+            logger.debug(f"Place #{index} sent to user")
         except Exception as e:
-            logger.error(f"Xabar yuborishda xatolik: {e}")
+            logger.error(f"Error sending message: {e}")
 
     if place_type == "carwash":
         await message.answer("✅ Eng yaqin 3 ta avtomoyka ko'rsatildi!", reply_markup=back2)
     else:
         await message.answer("✅ Eng yaqin 3 ta avtoservis ko'rsatildi!", reply_markup=back)
     
-    # Foydalanuvchini ro'yxatdan o'chirish
+    # Remove user from tracking
     user_place_type.pop(user_id, None)
-    logger.debug(f"Foydalanuvchi {user_id} user_place_type dan o'chirildi")
+    logger.debug(f"User {user_id} removed from user_place_type")
 
 @router.callback_query(F.data.startswith("geo_id_"))
-async def send_geo(call: CallbackQuery):
+async def send_geo(call: CallbackQuery) -> None:
+    """
+    Send geolocation for a selected place.
+    
+    Args:
+        call: Callback query with place ID in data
+    """
     await call.answer()
+    
+    # Parse and validate callback data
     parts = call.data.split("_", 3)
     if len(parts) < 4:
-        await call.answer("❌ Ma'lumot xato.", show_alert=True)
+        await call.answer("❌ Ma'lumot xato / Invalid data", show_alert=True)
         return
 
     place_type, place_id = parts[2], parts[3]
+    
+    # Validate place_type
+    if place_type not in ("autoservice", "carwash"):
+        logger.warning(f"Invalid place_type in callback: {place_type}")
+        await call.answer("❌ Noto'g'ri ma'lumot / Invalid data", show_alert=True)
+        return
+    
     place = GEO_CACHE.get(place_type, {}).get(place_id)
     if not place:
-        await call.answer("❌ Lokatsiya topilmadi yoki eskirgan ma'lumot.", show_alert=True)
+        await call.answer("❌ Lokatsiya topilmadi yoki eskirgan ma'lumot / Location not found", show_alert=True)
         return
 
     lat = place.get("lat")
     lon = place.get("lon")
     if lat is None or lon is None:
-        await call.answer("❌ Bu joy uchun koordinata mavjud emas.", show_alert=True)
+        await call.answer("❌ Bu joy uchun koordinata mavjud emas / No coordinates available", show_alert=True)
         return
 
     try:
         if call.message:
             await call.message.answer_location(latitude=float(lat), longitude=float(lon))
         else:
-            await call.answer("❌ Xabar topilmadi.", show_alert=True)
+            await call.answer("❌ Xabar topilmadi / Message not found", show_alert=True)
     except Exception as e:
-        logger.error(f"send_geo xatosi: {e}")
-        await call.answer("❌ Lokatsiyani yuborishda xatolik yuz berdi.", show_alert=True)
+        logger.error(f"send_geo error: {e}")
+        await call.answer("❌ Lokatsiyani yuborishda xatolik / Error sending location", show_alert=True)
