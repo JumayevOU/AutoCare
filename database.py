@@ -341,11 +341,11 @@ async def get_nearby_places(lat: float, lon: float, radius_km: float = 50.0, pla
     
     # Validate coordinates
     if not (-90 <= lat <= 90):
-        logger.error(f"❌ Invalid latitude: {lat}")
-        raise ValueError(f"Invalid latitude: {lat}. Must be between -90 and 90")
+        logger.error("❌ Invalid latitude provided")
+        raise ValueError(f"Invalid latitude. Must be between -90 and 90")
     if not (-180 <= lon <= 180):
-        logger.error(f"❌ Invalid longitude: {lon}")
-        raise ValueError(f"Invalid longitude: {lon}. Must be between -180 and 180")
+        logger.error("❌ Invalid longitude provided")
+        raise ValueError(f"Invalid longitude. Must be between -180 and 180")
     
     # Haversine formula for distance calculation
     query = f"""

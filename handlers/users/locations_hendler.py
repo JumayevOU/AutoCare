@@ -141,7 +141,7 @@ async def get_nearest_places(message: Message) -> None:
     
     # Validate coordinates range
     if not (-90 <= location.latitude <= 90) or not (-180 <= location.longitude <= 180):
-        logger.warning(f"Invalid coordinates from user {user_id}: {location.latitude}, {location.longitude}")
+        logger.warning(f"Invalid coordinates received from user {user_id}")
         await message.answer("❌ Noto'g'ri koordinatalar / Invalid coordinates")
         return
     
