@@ -19,6 +19,13 @@ try:
 except ImportError:
     back2 = None
 
+# Import DB functions with fallback
+try:
+    from database.crud import insert_autoservice, insert_carwash
+except ImportError:
+    insert_autoservice = None
+    insert_carwash = None
+
 # Global requests storage
 REQUESTS = {}
 
@@ -254,6 +261,101 @@ def setup_callback_handlers(router: Router):
             await call.answer("Bu ariza allaqachon qayta ishlangan.", show_alert=True)
             return
 
+        # Attempt to save to database
+        db_saved = False
+        if insert_autoservice is not None:
+            try:
+                data = req["data"]
+                
+                # Build name: prefer company if present and not "Yo'q", else name or "Unknown"
+                company = data.get('company', '')
+                name = data.get('name', 'Unknown')
+                if company and company != "Yo'q":
+                    entry_name = company
+                else:
+                    entry_name = name if name else 'Unknown'
+                
+                # Get lat/lon, fallback to 0.0 if missing
+                lat = data.get('geo_lat')
+                lon = data.get('geo_lon')
+                if lat is None or lon is None:
+                    print(f"⚠️ Warning: Missing geo coordinates for request {request_id}, using 0.0")
+                    lat = 0.0
+                    lon = 0.0
+                else:
+                    lat = float(lat)
+                    lon = float(lon)
+                
+                # Build services list
+                services_list = []
+                services_selected = data.get('services_selected', [])
+                if services_selected:
+                    # Map keys to human-readable labels
+                    service_dict = dict(SERVICE_OPTIONS)
+                    for key in services_selected:
+                        if key in service_dict:
+                            services_list.append(service_dict[key])
+                else:
+                    # Fallback: split services string by comma
+                    services_str = data.get('services', '')
+                    if services_str:
+                        services_list = [s.strip() for s in services_str.split(',') if s.strip()]
+                
+                # Build working_days list (integer indices 0..6)
+                working_days_list = []
+                working_days_selected = data.get('working_days_selected', [])
+                if working_days_selected:
+                    # Map weekday keys to integer indices
+                    weekday_dict = {key: idx for idx, (key, _) in enumerate(WEEKDAY_OPTIONS)}
+                    for key in working_days_selected:
+                        if key in weekday_dict:
+                            working_days_list.append(weekday_dict[key])
+                
+                # Parse working_hours
+                working_hours_str = data.get('working_hours', '')
+                is_24_7 = False
+                working_hours_dict = {}
+                if working_hours_str:
+                    # Check if 24/7 (case-insensitive, ignore spaces)
+                    normalized = working_hours_str.replace(' ', '').lower()
+                    if normalized == '24/7':
+                        is_24_7 = True
+                    elif '-' in working_hours_str:
+                        # Parse time range like "09:00-18:00"
+                        parts = working_hours_str.split('-', 1)
+                        if len(parts) == 2:
+                            working_hours_dict = {
+                                'start': parts[0].strip(),
+                                'end': parts[1].strip()
+                            }
+                
+                # Build DB entry
+                entry = {
+                    'id': uuid.uuid4().hex,
+                    'name': entry_name,
+                    'lat': lat,
+                    'lon': lon,
+                    'address': data.get('address_text'),
+                    'phone': data.get('phone'),
+                    'services': services_list,
+                    'working_days': working_days_list,
+                    'working_hours': working_hours_dict,
+                    'is_24_7': is_24_7
+                }
+                
+                # Insert into database
+                db_saved = await insert_autoservice(entry)
+                if db_saved:
+                    print(f"✅ Partnership request {request_id} saved to DB successfully")
+                else:
+                    print(f"⚠️ Failed to save partnership request {request_id} to DB")
+                    
+            except Exception as e:
+                print(f"❌ Error saving partnership request {request_id} to DB: {e}")
+                db_saved = False
+        else:
+            print("⚠️ insert_autoservice not available, skipping DB save")
+
         # Notify user
         user_chat_id = req["user_chat_id"]
         try:
@@ -262,12 +364,15 @@ def setup_callback_handlers(router: Router):
         except Exception as e:
             print("Error sending confirmation to user:", e)
 
-        # Update admin message
+        # Update admin message with DB save status
         admin_msg_id = req.get("admin_message_id")
         admin_chat_id = req.get("admin_chat_id", ADMIN_GROUP_ID)
         admin_text = req.get("admin_message_text", "")
         confirmer = call.from_user.full_name or str(call.from_user.id)
-        new_text = admin_text + f"\n\n✅ Ariza tasdiqlandi — <a href='tg://user?id={call.from_user.id}'>{confirmer}</a>"
+        
+        # Add DB save status line
+        db_status_line = "\n\n💾 Ma'lumotlar DB ga saqlandi." if db_saved else "\n\n⚠️ Ma'lumotlar DB ga saqlanmadi."
+        new_text = admin_text + f"\n\n✅ Ariza tasdiqlandi — <a href='tg://user?id={call.from_user.id}'>{confirmer}</a>" + db_status_line
 
         try:
             if admin_msg_id:
