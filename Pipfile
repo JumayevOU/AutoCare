@@ -4,10 +4,14 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-aiogram = "~=2.14"
-environs = "~=8.0.0"
+aiogram = "==3.22.0"
+environs = "==9.5.0"
+marshmallow = "==3.19.0"
+python-dotenv = "*"
+asyncpg = "*"
+aiohttp = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.9"
+python_version = "3.12"
