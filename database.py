@@ -1,4 +1,10 @@
 # database.py
+"""
+Database module for AutoCare bot.
+
+Provides PostgreSQL database operations with connection pooling,
+CRUD operations for autoservices and carwashes, and location-based queries.
+"""
 import os
 import asyncio
 import asyncpg
@@ -53,13 +59,29 @@ CREATE INDEX IF NOT EXISTS idx_carwash_services ON carwash USING GIN(services);
 """
 
 async def init_db(database_url: Optional[str] = None) -> None:
-    """Database va connection pool ni ishga tushiradi"""
+    """
+    Initialize database and create connection pool.
+    
+    Args:
+        database_url: PostgreSQL connection URL. If not provided, uses DATABASE_URL env var.
+        
+    Raises:
+        ValueError: If database URL is not provided or invalid.
+        asyncpg.PostgresError: If database connection or table creation fails.
+    """
     global pool
     db_url = database_url or DATABASE_URL
     
     if not db_url:
-        logger.error("❌ DATABASE_URL muhit o'zgaruvchisi topilmadi")
-        return
+        error_msg = "DATABASE_URL environment variable not found"
+        logger.error(f"❌ {error_msg}")
+        raise ValueError(error_msg)
+    
+    # Validate database URL format
+    if not db_url.startswith(('postgresql://', 'postgres://')):
+        error_msg = "Invalid DATABASE_URL format. Must start with postgresql:// or postgres://"
+        logger.error(f"❌ {error_msg}")
+        raise ValueError(error_msg)
     
     try:
         pool = await asyncpg.create_pool(
@@ -71,38 +93,80 @@ async def init_db(database_url: Optional[str] = None) -> None:
         
         async with pool.acquire() as conn:
             await conn.execute(CREATE_TABLES_SQL)
-            logger.info("✅ Database jadvallari yaratildi/tekshirildi")
+            logger.info("✅ Database tables created/verified successfully")
             
     except Exception as e:
-        logger.error(f"❌ Database ni ishga tushirishda xatolik: {e}")
+        logger.error(f"❌ Database initialization error: {e}")
         pool = None
         raise
 
 async def close_db() -> None:
-    """Connection pool ni yopadi"""
+    """Close database connection pool gracefully."""
     global pool
     if pool:
         await pool.close()
         pool = None
+        logger.info("✅ Database connection pool closed")
 
-async def get_connection():
-    """Connection olish"""
+async def get_connection() -> asyncpg.Connection:
+    """
+    Acquire a database connection from the pool.
+    
+    Returns:
+        asyncpg.Connection: Database connection from the pool.
+        
+    Raises:
+        RuntimeError: If database pool is not initialized.
+    """
     global pool
     if pool is None:
         await init_db()
+    if pool is None:
+        raise RuntimeError("Failed to initialize database connection pool")
     return await pool.acquire()
 
-async def release_connection(conn):
-    """Connection ni qaytarish"""
-    await pool.release(conn)
+async def release_connection(conn: asyncpg.Connection) -> None:
+    """
+    Release a connection back to the pool.
+    
+    Args:
+        conn: Database connection to release.
+    """
+    if pool:
+        await pool.release(conn)
 
 # ================== CRUD OPERATIONLARI ==================
 
 async def insert_autoservice(data: Dict[str, Any]) -> bool:
-    """Avtoservis qo'shish"""
+    """
+    Insert or update an autoservice in the database.
+    
+    Args:
+        data: Dictionary containing autoservice information with keys:
+            - id: Unique identifier
+            - name: Service name
+            - lat: Latitude
+            - lon: Longitude
+            - address: Optional address
+            - phone: Optional phone number
+            - services: List of services offered
+            - working_days: List of working day numbers (0-6)
+            - working_hours: Dict with 'start' and 'end' times
+            - is_24_7: Boolean for 24/7 operation
+            
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     global pool
     if pool is None:
         await init_db()
+    
+    # Validate required fields
+    required_fields = ['id', 'name', 'lat', 'lon']
+    for field in required_fields:
+        if field not in data:
+            logger.error(f"❌ Missing required field: {field}")
+            return False
     
     query = """
     INSERT INTO autoservice (
@@ -137,14 +201,39 @@ async def insert_autoservice(data: Dict[str, Any]) -> bool:
             )
             return True
     except Exception as e:
-        logger.error(f"❌ Avtoservis qo'shishda xatolik: {e}")
+        logger.error(f"❌ Error inserting autoservice: {e}")
         return False
 
 async def insert_carwash(data: Dict[str, Any]) -> bool:
-    """Avtomoyka qo'shish"""
+    """
+    Insert or update a carwash in the database.
+    
+    Args:
+        data: Dictionary containing carwash information with keys:
+            - id: Unique identifier
+            - name: Carwash name
+            - lat: Latitude
+            - lon: Longitude
+            - address: Optional address
+            - phone: Optional phone number
+            - services: List of services offered
+            - working_days: List of working day numbers (0-6)
+            - working_hours: Dict with 'start' and 'end' times
+            - is_24_7: Boolean for 24/7 operation
+            
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     global pool
     if pool is None:
         await init_db()
+    
+    # Validate required fields
+    required_fields = ['id', 'name', 'lat', 'lon']
+    for field in required_fields:
+        if field not in data:
+            logger.error(f"❌ Missing required field: {field}")
+            return False
     
     query = """
     INSERT INTO carwash (
@@ -179,11 +268,16 @@ async def insert_carwash(data: Dict[str, Any]) -> bool:
             )
             return True
     except Exception as e:
-        logger.error(f"❌ Avtomoyka qo'shishda xatolik: {e}")
+        logger.error(f"❌ Error inserting carwash: {e}")
         return False
 
 async def get_all_autoservices() -> List[Dict[str, Any]]:
-    """Barcha avtoservislarni olish"""
+    """
+    Retrieve all autoservices from the database.
+    
+    Returns:
+        List[Dict[str, Any]]: List of autoservice records as dictionaries.
+    """
     global pool
     if pool is None:
         await init_db()
@@ -194,11 +288,16 @@ async def get_all_autoservices() -> List[Dict[str, Any]]:
             rows = await conn.fetch(query)
             return [dict(row) for row in rows]
     except Exception as e:
-        logger.error(f"❌ Avtoservislarni olishda xatolik: {e}")
+        logger.error(f"❌ Error fetching autoservices: {e}")
         return []
 
 async def get_all_carwashes() -> List[Dict[str, Any]]:
-    """Barcha avtomoykalarni olish"""
+    """
+    Retrieve all carwashes from the database.
+    
+    Returns:
+        List[Dict[str, Any]]: List of carwash records as dictionaries.
+    """
     global pool
     if pool is None:
         await init_db()
@@ -209,21 +308,46 @@ async def get_all_carwashes() -> List[Dict[str, Any]]:
             rows = await conn.fetch(query)
             return [dict(row) for row in rows]
     except Exception as e:
-        logger.error(f"❌ Avtomoykalarni olishda xatolik: {e}")
+        logger.error(f"❌ Error fetching carwashes: {e}")
         return []
 
 async def get_nearby_places(lat: float, lon: float, radius_km: float = 50.0, place_type: str = "autoservice") -> List[Dict[str, Any]]:
     """
-    Berilgan koordinatalarga yaqin joylarni topish
+    Find nearby places within a specified radius using Haversine formula.
+    
+    Args:
+        lat: User's latitude
+        lon: User's longitude
+        radius_km: Search radius in kilometers (default: 50.0)
+        place_type: Type of place to search ("autoservice" or "carwash")
+        
+    Returns:
+        List[Dict[str, Any]]: List of nearby places sorted by distance, limited to 10 results.
+        
+    Raises:
+        ValueError: If place_type is not "autoservice" or "carwash"
     """
     global pool
     if pool is None:
         await init_db()
         if pool is None:
-            logger.error("❌ Database pool hali ishga tushmadi")
+            logger.error("❌ Database pool not initialized")
             return []
     
-    # Haversine formulasi bilan masofa hisoblash
+    # Validate place_type to prevent SQL injection
+    if place_type not in ("autoservice", "carwash"):
+        logger.error(f"❌ Invalid place_type: {place_type}")
+        raise ValueError(f"Invalid place_type: {place_type}. Must be 'autoservice' or 'carwash'")
+    
+    # Validate coordinates
+    if not (-90 <= lat <= 90):
+        logger.error(f"❌ Invalid latitude: {lat}")
+        raise ValueError(f"Invalid latitude: {lat}. Must be between -90 and 90")
+    if not (-180 <= lon <= 180):
+        logger.error(f"❌ Invalid longitude: {lon}")
+        raise ValueError(f"Invalid longitude: {lon}. Must be between -180 and 180")
+    
+    # Haversine formula for distance calculation
     query = f"""
     SELECT *,
         (6371 * acos(cos(radians($1)) * cos(radians(lat)) * 
@@ -242,28 +366,51 @@ async def get_nearby_places(lat: float, lon: float, radius_km: float = 50.0, pla
             rows = await conn.fetch(query, lat, lon, radius_km)
             return [dict(row) for row in rows]
     except Exception as e:
-        logger.error(f"❌ Yaqin joylarni topishda xatolik: {e}")
+        logger.error(f"❌ Error finding nearby places: {e}")
         return []
 
 # ... (qolgan funksiyalar o'zgarmaydi)
 
 async def search_places_by_service(service_name: str, place_type: str = "autoservice") -> List[Dict[str, Any]]:
     """
-    Xizmat nomi bo'yicha qidirish
+    Search places by service name.
+    
+    Args:
+        service_name: Name of the service to search for
+        place_type: Type of place ("autoservice" or "carwash")
+        
+    Returns:
+        List[Dict[str, Any]]: List of places offering the specified service.
+        
+    Raises:
+        ValueError: If place_type is not "autoservice" or "carwash"
     """
+    # Validate place_type to prevent SQL injection
+    if place_type not in ("autoservice", "carwash"):
+        logger.error(f"❌ Invalid place_type: {place_type}")
+        raise ValueError(f"Invalid place_type: {place_type}. Must be 'autoservice' or 'carwash'")
+    
     query = f"SELECT * FROM {place_type} WHERE services @> $1::jsonb"
     try:
         async with pool.acquire() as conn:
             rows = await conn.fetch(query, json.dumps([service_name]))
             return [dict(row) for row in rows]
     except Exception as e:
-        print(f"❌ Xizmat bo'yicha qidirishda xatolik: {e}")
+        logger.error(f"❌ Error searching by service: {e}")
         return []
 
 # ================== BATCH OPERATIONLARI ==================
 
 async def batch_insert_autoservices(services_data: List[Dict[str, Any]]) -> bool:
-    """Bir nechta avtoservislarni bir vaqtda qo'shish"""
+    """
+    Insert multiple autoservices in a single transaction.
+    
+    Args:
+        services_data: List of autoservice data dictionaries
+        
+    Returns:
+        bool: True if all insertions were successful, False otherwise.
+    """
     try:
         async with pool.acquire() as conn:
             async with conn.transaction():
@@ -271,11 +418,19 @@ async def batch_insert_autoservices(services_data: List[Dict[str, Any]]) -> bool
                     await insert_autoservice(data)
         return True
     except Exception as e:
-        print(f"❌ Batch insert xatolik: {e}")
+        logger.error(f"❌ Batch insert error: {e}")
         return False
 
 async def batch_insert_carwashes(carwashes_data: List[Dict[str, Any]]) -> bool:
-    """Bir nechta avtomoykalarni bir vaqtda qo'shish"""
+    """
+    Insert multiple carwashes in a single transaction.
+    
+    Args:
+        carwashes_data: List of carwash data dictionaries
+        
+    Returns:
+        bool: True if all insertions were successful, False otherwise.
+    """
     try:
         async with pool.acquire() as conn:
             async with conn.transaction():
@@ -283,16 +438,21 @@ async def batch_insert_carwashes(carwashes_data: List[Dict[str, Any]]) -> bool:
                     await insert_carwash(data)
         return True
     except Exception as e:
-        print(f"❌ Batch insert xatolik: {e}")
+        logger.error(f"❌ Batch insert error: {e}")
         return False
 
 # ================== TEST QISMI ==================
 
-async def test_database():
-    """Database funksionalligini test qilish"""
+async def test_database() -> None:
+    """
+    Test database functionality with sample data.
+    
+    This function creates test autoservice entries and verifies
+    database operations including insert, fetch, and search.
+    """
     await init_db()
     
-    # Test ma'lumotlari
+    # Test data
     test_autoservice = {
         "id": "test_1",
         "name": "Test Autoservice",
@@ -306,17 +466,17 @@ async def test_database():
         "is_24_7": False
     }
     
-    # Qo'shish testi
+    # Insert test
     success = await insert_autoservice(test_autoservice)
-    print(f"✅ Qo'shish testi: {'Muvaffaqiyatli' if success else 'Muvaffaqiyatsiz'}")
+    print(f"✅ Insert test: {'Successful' if success else 'Failed'}")
     
-    # O'qish testi
+    # Fetch test
     services = await get_all_autoservices()
-    print(f"✅ O'qish testi: {len(services)} ta servis topildi")
+    print(f"✅ Fetch test: {len(services)} service(s) found")
     
-    # Qidiruv testi
+    # Search test
     nearby = await get_nearby_places(41.311081, 69.240562, 5.0)
-    print(f"✅ Qidiruv testi: {len(nearby)} ta yaqin joy topildi")
+    print(f"✅ Search test: {len(nearby)} nearby place(s) found")
     
     await close_db()
 
