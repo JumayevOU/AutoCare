@@ -309,10 +309,9 @@ def setup_callback_handlers(router: Router):
                 working_days_selected = data.get('working_days_selected', [])
                 if working_days_selected:
                     # Map weekday keys to integer indices
-                    weekday_dict = {key: idx for idx, (key, _) in enumerate(WEEKDAY_OPTIONS)}
                     for key in working_days_selected:
-                        if key in weekday_dict:
-                            working_days_list.append(weekday_dict[key])
+                        if key in WEEKDAY_TO_INDEX:
+                            working_days_list.append(WEEKDAY_TO_INDEX[key])
                 
                 # Parse working_hours
                 working_hours_str = data.get('working_hours', '')
