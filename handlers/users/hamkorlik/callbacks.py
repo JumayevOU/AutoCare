@@ -348,7 +348,7 @@ def setup_callback_handlers(router: Router):
                 
                 # Insert into database
                 db_saved = await insert_autoservice(entry)
-                if db_saved:
+                if db_saved is not None:
                     logger.info(f"Partnership request {request_id} saved to DB successfully")
                 else:
                     logger.warning(f"Failed to save partnership request {request_id} to DB")
