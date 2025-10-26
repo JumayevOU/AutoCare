@@ -273,10 +273,7 @@ def setup_callback_handlers(router: Router):
                 # Build name: prefer company if present and not "Yo'q", else name or "Unknown"
                 company = data.get('company', '')
                 name = data.get('name', 'Unknown')
-                if company and company != "Yo'q":
-                    entry_name = company
-                else:
-                    entry_name = name if name else 'Unknown'
+                entry_name = company if (company and company != "Yo'q") else name
                 
                 # Get lat/lon, fallback to 0.0 if missing
                 lat = data.get('geo_lat')
