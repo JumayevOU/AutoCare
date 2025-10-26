@@ -334,7 +334,7 @@ def setup_callback_handlers(router: Router):
                 
                 # Build DB entry
                 entry = {
-                    'id': uuid.uuid4().hex,
+                    'id': str(uuid.uuid4()),
                     'name': entry_name,
                     'lat': lat,
                     'lon': lon,
